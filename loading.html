@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000000;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #canvas {
+            line-height: 1.2;
+            letter-spacing: 2px;
+            color: #ffffff;
+            font-size: 8px;
+            white-space: pre;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas"></div>
+
+    <script>
+        const width = 160;
+        const height = 44;
+        const distanceFromCam = 100;
+        const K1 = 40;
+        const backgroundChar = ' ';
+        const incrementSpeed = 0.3;
+
+        let A = 0.0, B = 0.0, C = 0.0;
+
+        function calculateX(i, j, k) {
+            return (j * Math.sin(A) * Math.sin(B) * Math.cos(C) - 
+                    k * Math.cos(A) * Math.sin(B) * Math.cos(C) +
+                    j * Math.cos(A) * Math.sin(C) + 
+                    k * Math.sin(A) * Math.sin(C) + 
+                    i * Math.cos(B) * Math.cos(C));
+        }
+
+        function calculateY(i, j, k) {
+            return (j * Math.cos(A) * Math.cos(C) + 
+                    k * Math.sin(A) * Math.cos(C) -
+                    j * Math.sin(A) * Math.sin(B) * Math.sin(C) + 
+                    k * Math.cos(A) * Math.sin(B) * Math.sin(C) -
+                    i * Math.cos(B) * Math.sin(C));
+        }
+
+        function calculateZ(i, j, k) {
+            return (k * Math.cos(A) * Math.cos(B) - 
+                    j * Math.sin(A) * Math.cos(B) + 
+                    i * Math.sin(B));
+        }
+
+        function calculateForSurface(solarX, solarY, solarZ, ch, buffer, zBuffer, horizontalOffset) {
+            const x = calculateX(solarX, solarY, solarZ);
+            const y = calculateY(solarX, solarY, solarZ);
+            const z = calculateZ(solarX, solarY, solarZ) + distanceFromCam;
+            
+            if (z <= 0) return;
+            
+            const ooz = 1 / z;
+            const xp = Math.floor(width / 2 + horizontalOffset + K1 * ooz * x * 2);
+            const yp = Math.floor(height / 2 + K1 * ooz * y);
+            
+            const idx = xp + yp * width;
+            if (idx >= 0 && idx < width * height && xp >= 0 && xp < width && yp >= 0 && yp < height) {
+                if (ooz > zBuffer[idx]) {
+                    zBuffer[idx] = ooz;
+                    buffer[idx] = ch;
+                }
+            }
+        }
+
+        function renderSolar(solarSize, horizontalOffset, buffer, zBuffer) {
+            const apexHeight = solarSize;
+            const baseSize = solarSize;
+            
+            for (let t = 0; t <= 1.0; t += 0.02) {
+                const currentSize = baseSize * (1 - t);
+                
+                // Front face
+                for (let s = -Math.floor(currentSize); s <= Math.floor(currentSize); s++) {
+                    calculateForSurface(
+                        s * incrementSpeed,
+                        apexHeight * (1 - 2 * t),
+                        -currentSize,
+                        '@', buffer, zBuffer, horizontalOffset
+                    );
+                }
+                
+                // Right face
+                for (let s = -Math.floor(currentSize); s <= Math.floor(currentSize); s++) {
+                    calculateForSurface(
+                        currentSize,
+                        apexHeight * (1 - 2 * t),
+                        s * incrementSpeed,
+                        '#', buffer, zBuffer, horizontalOffset
+                    );
+                }
+                
+                // Back face
+                for (let s = -Math.floor(currentSize); s <= Math.floor(currentSize); s++) {
+                    calculateForSurface(
+                        s * incrementSpeed,
+                        apexHeight * (1 - 2 * t),
+                        currentSize,
+                        '%', buffer, zBuffer, horizontalOffset
+                    );
+                }
+                
+                // Left face
+                for (let s = -Math.floor(currentSize); s <= Math.floor(currentSize); s++) {
+                    calculateForSurface(
+                        -currentSize,
+                        apexHeight * (1 - 2 * t),
+                        s * incrementSpeed,
+                        '*', buffer, zBuffer, horizontalOffset
+                    );
+                }
+            }
+            
+            // Base
+            for (let solarXVal = -Math.floor(baseSize); solarXVal < Math.floor(baseSize); solarXVal++) {
+                for (let solarZVal = -Math.floor(baseSize); solarZVal < Math.floor(baseSize); solarZVal++) {
+                    calculateForSurface(
+                        solarXVal * incrementSpeed,
+                        -apexHeight,
+                        solarZVal * incrementSpeed,
+                        '+', buffer, zBuffer, horizontalOffset
+                    );
+                }
+            }
+        }
+
+        function animate() {
+            const buffer = new Array(width * height).fill(backgroundChar);
+            const zBuffer = new Array(width * height).fill(0);
+            
+            renderSolar(15, 0, buffer, zBuffer);
+            
+            let output = '';
+            for (let k = 0; k < width * height; k++) {
+                if (k % width === 0 && k !== 0) {
+                    output += '\n';
+                }
+                output += buffer[k];
+            }
+            
+            document.getElementById('canvas').textContent = output;
+            
+            A += 0.005;
+            B += 0.005;
+            C += 0.001;
+            
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
